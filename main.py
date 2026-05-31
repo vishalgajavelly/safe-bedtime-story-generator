@@ -1,12 +1,9 @@
 """
-Hippocratic AI Coding Assignment
-Bedtime Story Generator for ages 5-10
+Bedtime Story Generator for ages 5-10.
 
-If I had 2 more hours, I would add:
-1. A lightweight evaluation harness that runs 20 prompts and summarizes judge/validator pass rates.
-2. Better age adaptation for 5-7 vs. 8-10 year olds.
-3. A parent/teacher mode for themes like confidence, sharing, first day of school, or grief.
-4. More robust safety test cases for scary, intense, or emotionally sensitive prompts.
+This CLI turns a simple story idea into a gentle, child-safe bedtime story.
+It uses a story planner, deterministic validators, an LLM judge, targeted
+revision, and a final bedtime polish pass.
 """
 
 import json

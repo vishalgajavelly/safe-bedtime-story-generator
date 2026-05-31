@@ -1,161 +1,133 @@
-# Bedtime Story Safety Pipeline
+# Bedtime Story Generator
 
-This is a compact Python CLI for generating child-safe bedtime stories for ages 5-10. It keeps the original assignment's `gpt-3.5-turbo` model, while using the current OpenAI Python client with a legacy SDK fallback. Story generation is wrapped in a small quality and safety pipeline.
+A Python command-line app that turns a simple story idea into a gentle bedtime story for children ages 5-10.
 
-The goal is not just to produce a creative story. The system should preserve harmless user intent while making the final story age-appropriate, calm, emotionally warm, and sleep-friendly.
+The app uses OpenAI's `gpt-3.5-turbo` model and wraps generation in a small review pipeline so the final story is age-appropriate, calm, coherent, and sleep-friendly.
 
-## How to Run
+## Features
 
-1. Install the OpenAI Python package if needed:
+- Accepts a free-form bedtime story request from the user.
+- Converts the request into a structured child-safe story plan.
+- Softens scary or intense ideas into gentle, age-appropriate premises.
+- Generates a complete story with a title, clear arc, and calm ending.
+- Uses deterministic checks for word count, title, unsafe terms, character coverage, and bedtime cues.
+- Uses an LLM judge to score safety, age fit, bedtime quality, and story quality.
+- Revises weak drafts once, then applies a final bedtime polish.
+- Prints a short story card with quality scores and parent-facing context.
+
+## Project Files
+
+```text
+main.py                 Main CLI and story generation pipeline
+tests.py                Validation runner with mock and live OpenAI modes
+test_prompts.txt        Sample prompts for manual testing
+validation_results.txt  Saved live validation output
+.env.example            Example environment variable file
+```
+
+## Setup
+
+Install the OpenAI Python package:
 
 ```bash
 pip install openai
 ```
 
-2. Set your API key:
+Set your OpenAI API key:
 
 ```bash
 export OPENAI_API_KEY=your_api_key_here
 ```
 
-3. Run the CLI:
+Do not commit a real API key.
+
+## Run
+
+Start the interactive CLI:
 
 ```bash
 python main.py
 ```
 
-The program asks:
+Example prompt:
 
 ```text
-What kind of bedtime story would you like?
+A dragon who loses his roar and learns to ask for help.
 ```
 
-It then prints a story card followed by the final bedtime story.
+The app prints a story card followed by the final bedtime story.
 
-## Batch Validation
+## Validate
 
-Run the lightweight mock suite without spending API calls:
+Run the local mock validation suite without using API credits:
 
 ```bash
 python tests.py --mock --verbose
 ```
 
-Run the same prompts against OpenAI after setting `OPENAI_API_KEY`:
+Run the same validation prompts against OpenAI:
 
 ```bash
 python tests.py --verbose --show-story
 ```
 
-The validation runner prints each prompt's title, word count, judge score, safety score, story-quality scores, validator failures, and pass/check result.
-Use `--show-story` when you want the full story card and final story text for every prompt.
-It also prints which pipeline stage was accepted, so a broken final taper can be seen falling back to the last passing full story.
-
-## Environment Setup
-
-Copy `.env.example` if you use a shell or environment loader:
-
-```bash
-OPENAI_API_KEY=your_api_key_here
-```
-
-Do not commit a real API key.
+The validation runner reports each prompt's title, word count, judge score, safety score, validator failures, accepted pipeline stage, and pass/fail result.
 
 ## Architecture
 
 ```text
-+--------------------+
-| User Story Request |
-+---------+----------+
-          |
-          v
-+-----------------------------+
-| Story Spec Builder          |
-| Extracts characters, theme, |
-| tone, constraints, age fit  |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Safety Transformer          |
-| Converts risky premises into|
-| child-safe story specs      |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Storyteller                 |
-| Writes bedtime story        |
-| from the safe spec          |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Deterministic Validators    |
-| Word count, title, required |
-| characters, ending cues     |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| LLM Judge                   |
-| Scores safety, age fit,     |
-| bedtime tone, story arc     |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Targeted Rewriter           |
-| Fixes failed gates only     |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Final Bedtime Taper         |
-| Softens ending for sleep    |
-+-------------+---------------+
-              |
-              v
-+-----------------------------+
-| Story Card + Final Story    |
-+-----------------------------+
+User request
+    |
+    v
+Story spec builder
+    |
+    v
+Safe story plan
+    |
+    v
+Story generator
+    |
+    v
+Deterministic validators
+    |
+    v
+LLM judge
+    |
+    +--> accepted draft
+    |
+    +--> targeted revision, if needed
+             |
+             v
+Final bedtime polish
+    |
+    v
+Story card + final story
 ```
 
-## Design Decisions
+## How It Works
 
-The pipeline starts by building a structured story spec instead of passing the raw request directly to the storyteller. This lets the system preserve harmless user intent while transforming risky ideas, such as scary monsters or intense danger, into gentle bedtime-safe premises. The spec also includes a compact story spine: child takeaway, gentle pulse, character arc, connected plot beats, and a bedtime taper plan.
+1. `build_story_spec` turns the user request into a structured plan with characters, tone, theme, safety notes, and bedtime requirements.
+2. `generate_story` writes the first story from that plan.
+3. `run_validators` checks objective constraints in Python.
+4. `judge_story` asks the LLM to review the story and return structured JSON scores.
+5. `revise_story` makes one targeted revision if the draft fails validation or judge gates.
+6. `apply_bedtime_taper` softens the ending so the story lands quietly.
 
-I avoided relying only on a single LLM score because scores can be noisy. The deterministic validators handle checks Python can do reliably: word count, title shape, requested character presence, obvious banned terms, and calm ending cues.
+The model name remains `gpt-3.5-turbo` as required by the assignment.
 
-The LLM judge uses hard gates for safety, age appropriateness, bedtime calmness, and ending softness. A story can be imaginative and still fail if it is too intense for bedtime. It also scores character arc, plot coherence, and bedtime taper so safe-but-random stories can be revised. The prompts use structural references to classic bedtime books, such as narrowing attention, gentle repetition, quiet sensory detail, homecoming, and earned stillness. They do not copy copyrighted text. The prompts and validators discourage moral-summary language, so the child takeaway has to appear through a small action or image instead of being announced. The judge returns targeted edit instructions instead of generic feedback, which makes the revision pass focused and easy to explain.
+## Validation Summary
 
-Revision rounds are capped to control latency, cost, and prevent infinite loops. The final bedtime taper is specific to the use case: a bedtime story should become calmer near the end, not more exciting. If that taper produces an invalid shortened fragment, the pipeline falls back to the last passing full story.
-
-## Why This Is Better Than Simple Score-Threshold Judging
-
-A simple "score the story and retry if below 8" loop is brittle. It does not explain what failed, and it can waste retries rewriting good parts of the story. This implementation separates responsibilities:
-
-- Deterministic validators check objective constraints.
-- The judge evaluates subjective quality and child safety.
-- Hard gates prevent a high creativity score from masking safety or bedtime-tone issues.
-- The targeted rewriter fixes only the failed gates and requested edits.
-- The bedtime taper polishes the final emotional landing.
-
-That combination makes the system more trustworthy and easier to debug in a review.
-
-## What I Would Build Next With 2 More Hours
-
-1. A small automated evaluation harness that runs 20 story prompts and summarizes judge and validator pass rates.
-2. Better age-level adaptation for 5-7 vs. 8-10 year olds.
-3. A parent/teacher mode that can request themes like confidence, grief, sharing, or first day of school.
-4. More robust safety testing for scary or emotionally intense prompts.
-
-## Example Prompts to Test
+The included validation run passed all six sample prompts:
 
 ```text
-A story about a girl named Alice and her best friend Bob, who is a cat.
-A dragon who loses his roar and learns to ask for help.
-A scary monster chasing kids through a forest.
-A robot who cannot fall asleep.
-A space adventure that is exciting but not scary.
-A shy cloud who wants to make friends with the moon.
+Summary: 6/6 passed
 ```
+
+Sample prompts include friendship stories, a gentle dragon story, a scary premise converted into a safe version, a sleepless robot, a calm space adventure, and a shy cloud befriending the moon.
+
+## Future Improvements
+
+- Add age-specific modes for younger and older children within the 5-10 range.
+- Add an optional parent/teacher theme selector.
+- Expand the validation suite with more safety and quality edge cases.
+- Add a lightweight feedback loop so users can ask for a softer, sillier, shorter, or more magical revision.
