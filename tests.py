@@ -12,11 +12,64 @@ TEST_PROMPTS = [
     "A robot who cannot fall asleep.",
     "A space adventure that is exciting but not scary.",
     "A shy cloud who wants to make friends with the moon.",
+    "A thunderstorm that sounds scary at first but becomes peaceful by bedtime.",
+    "An exciting race through a castle that needs to end calmly for sleep.",
+    "A story about named friends Priya and Max sharing a lantern in the garden.",
+    "A bedtime story where the final paragraph must feel quiet, safe, and sleepy.",
 ]
 
 
+def fake_judge_result(decision: str = "accept") -> dict:
+    if decision == "revise":
+        return {
+            "decision": "revise",
+            "overall_score": 7.4,
+            "failed_gates": ["bedtime_quality"],
+            "scores": {
+                "safety": 9.5,
+                "age_fit": 9.0,
+                "bedtime_calmness": 7.5,
+                "ending_softness": 7.2,
+                "story_arc": 8.0,
+                "character_arc": 8.0,
+                "plot_coherence": 8.0,
+                "bedtime_taper": 7.5,
+                "emotional_warmth": 8.0,
+                "creativity": 8.0,
+                "instruction_following": 8.0,
+            },
+            "specific_issues": ["The ending needs a softer bedtime landing."],
+            "edit_instructions": [
+                "Keep the story intact but make the last paragraph quieter and more sleep-friendly."
+            ],
+            "parent_note": "This draft is safe but needs a calmer ending.",
+        }
+
+    return {
+        "decision": "accept",
+        "overall_score": 8.8,
+        "failed_gates": [],
+        "scores": {
+            "safety": 9.5,
+            "age_fit": 9.0,
+            "bedtime_calmness": 8.8,
+            "ending_softness": 9.0,
+            "story_arc": 8.5,
+            "character_arc": 8.2,
+            "plot_coherence": 8.4,
+            "bedtime_taper": 8.8,
+            "emotional_warmth": 9.0,
+            "creativity": 8.0,
+            "instruction_following": 9.0,
+        },
+        "specific_issues": [],
+        "edit_instructions": [],
+        "parent_note": "This story is gentle and ends with a calm bedtime resolution.",
+    }
+
+
 def fake_call_model(prompt: str, max_tokens: int = 3000, temperature: float = 0.1) -> str:
-    if "Story Spec Builder" in prompt:
+    if "children's bedtime story planner" in prompt:
         return json.dumps(
             {
                 "original_request": "test prompt",
@@ -56,29 +109,11 @@ def fake_call_model(prompt: str, max_tokens: int = 3000, temperature: float = 0.
         )
 
     if "children's bedtime story editor" in prompt:
-        return json.dumps(
-            {
-                "decision": "accept",
-                "overall_score": 8.8,
-                "failed_gates": [],
-                "scores": {
-                    "safety": 9.5,
-                    "age_fit": 9.0,
-                    "bedtime_calmness": 8.8,
-                    "ending_softness": 9.0,
-                    "story_arc": 8.5,
-                    "character_arc": 8.2,
-                    "plot_coherence": 8.4,
-                    "bedtime_taper": 8.8,
-                    "emotional_warmth": 9.0,
-                    "creativity": 8.0,
-                    "instruction_following": 9.0,
-                },
-                "specific_issues": [],
-                "edit_instructions": [],
-                "parent_note": "This story is gentle and ends with a calm bedtime resolution.",
-            }
-        )
+        fake_call_model.judge_calls = getattr(fake_call_model, "judge_calls", 0) + 1
+        if fake_call_model.judge_calls == 1:
+            return json.dumps(fake_judge_result("revise"))
+
+        return json.dumps(fake_judge_result("accept"))
 
     return "Mira and the Moonlit Path\n\n" + (
         '"May I ask for help?" Mira whispered. "I can sit with you," said Nan. '
@@ -115,6 +150,7 @@ def summarize_iteration(stage_result: dict) -> str:
 
 def run_suite(use_mock: bool, verbose: bool, show_story: bool) -> bool:
     failures = 0
+    revision_path_seen = False
     for index, prompt in enumerate(TEST_PROMPTS, 1):
         print(f"\n[{index}] {prompt}")
         try:
@@ -145,6 +181,11 @@ def run_suite(use_mock: bool, verbose: bool, show_story: bool) -> bool:
         )
         print(f"Validator Failures: {failed_checks or 'none'}")
         print(f"Accepted Stage: {metadata.get('accepted_stage', 'unknown')}")
+        if any(
+            stage_result.get("stage", "").startswith("revision_")
+            for stage_result in metadata.get("iteration_history", [])
+        ):
+            revision_path_seen = True
         if verbose:
             print("Iterations:")
             for stage_result in metadata.get("iteration_history", []):
@@ -168,6 +209,11 @@ def run_suite(use_mock: bool, verbose: bool, show_story: bool) -> bool:
             print("RESULT: CHECK")
         else:
             print("RESULT: PASS")
+
+    if use_mock:
+        print(f"Mock Revision Path: {'covered' if revision_path_seen else 'missing'}")
+        if not revision_path_seen:
+            failures += 1
 
     print(f"\nSummary: {len(TEST_PROMPTS) - failures}/{len(TEST_PROMPTS)} passed")
     return failures == 0
@@ -193,6 +239,7 @@ def main_cli() -> None:
     args = parser.parse_args()
 
     if args.mock:
+        fake_call_model.judge_calls = 0
         with patch("main.call_model", side_effect=fake_call_model):
             ok = run_suite(
                 use_mock=True, verbose=args.verbose, show_story=args.show_story
@@ -206,4 +253,5 @@ def main_cli() -> None:
 
 
 if __name__ == "__main__":
+    fake_call_model.judge_calls = 0
     main_cli()

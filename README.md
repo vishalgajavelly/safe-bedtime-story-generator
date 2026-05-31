@@ -12,7 +12,7 @@ The app uses OpenAI's `gpt-3.5-turbo` model and wraps generation in a small revi
 - Generates a complete story with a title, clear arc, and calm ending.
 - Uses deterministic checks for word count, title, unsafe terms, character coverage, and bedtime cues.
 - Uses an LLM judge to score safety, age fit, bedtime quality, and story quality.
-- Revises weak drafts once, then applies a final bedtime polish.
+- Revises weak drafts up to two times, then applies a final bedtime polish.
 - Prints a short story card with quality scores and parent-facing context.
 
 ## Project Files
@@ -72,6 +72,15 @@ python tests.py --verbose --show-story
 ```
 
 The validation runner reports each prompt's title, word count, judge score, safety score, validator failures, accepted pipeline stage, and pass/fail result.
+
+## Safety and Deployment Notes
+
+This is a takehome prototype, not a production safety system. It uses layered checks to make the output more reliable:
+
+- Prompt constraints guide the planner, storyteller, judge, revision, and final polish steps.
+- Deterministic validators check word count, title shape, obvious unsafe terms, requested character coverage, and bedtime ending cues.
+- LLM judge gates require strong safety, age-fit, bedtime-quality, and overall scores before a story is accepted.
+- The pipeline keeps the best passing candidate so a final polish step cannot overwrite a previously acceptable story with a weaker version.
 
 ## Architecture
 
@@ -151,20 +160,20 @@ The validation runner reports each prompt's title, word count, judge score, safe
 2. `generate_story` writes the first story from that plan.
 3. `run_validators` checks objective constraints in Python.
 4. `judge_story` asks the LLM to review the story and return structured JSON scores.
-5. `revise_story` makes one targeted revision if the draft fails validation or judge gates.
+5. `revise_story` makes up to two targeted revisions if the draft fails validation or judge gates.
 6. `apply_bedtime_taper` softens the ending so the story lands quietly.
 
 The model name remains `gpt-3.5-turbo` as required by the assignment.
 
 ## Validation Summary
 
-The included validation run passed all six sample prompts:
+The included live validation run passed all six original sample prompts:
 
 ```text
 Summary: 6/6 passed
 ```
 
-Sample prompts include friendship stories, a gentle dragon story, a scary premise converted into a safe version, a sleepless robot, a calm space adventure, and a shy cloud befriending the moon.
+The mock validation suite also includes additional edge prompts for scary premises, high-energy adventures, named-character preservation, and calm bedtime endings.
 
 ## Future Improvements
 
