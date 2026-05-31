@@ -76,32 +76,73 @@ The validation runner reports each prompt's title, word count, judge score, safe
 ## Architecture
 
 ```text
-User request
-    |
-    v
-Story spec builder
-    |
-    v
-Safe story plan
-    |
-    v
-Story generator
-    |
-    v
-Deterministic validators
-    |
-    v
-LLM judge
-    |
-    +--> accepted draft
-    |
-    +--> targeted revision, if needed
++----------------+
+|      User      |
+| story request  |
++-------+--------+
+        |
+        v
++---------------------------+
+| Story Spec Builder Prompt |
+| extracts theme, tone,     |
+| characters, constraints   |
++------------+--------------+
              |
              v
-Final bedtime polish
-    |
-    v
-Story card + final story
++---------------------------+
+| Child-Safe Story Spec     |
+| safe premise + bedtime    |
+| requirements              |
++------------+--------------+
+             |
+             v
++---------------------------+
+| Storyteller Prompt        |
+| generates first draft     |
+| from the safe spec        |
++------------+--------------+
+             |
+             v
++---------------------------+
+| Deterministic Validators  |
+| word count, title, unsafe |
+| terms, characters, ending |
++------------+--------------+
+             |
+             v
++---------------------------+
+| LLM Judge Prompt          |
+| scores safety, age fit,   |
+| bedtime quality, story    |
++------------+--------------+
+             |
+             +------------------+
+             |                  |
+             v                  v
+     +---------------+   +---------------------+
+     | Accept Draft  |   | Revision Prompt     |
+     | if it passes  |   | fixes failed checks |
+     +-------+-------+   +----------+----------+
+             |                      |
+             |                      v
+             |           +---------------------+
+             |           | Rewritten Draft     |
+             |           | revalidated/judged  |
+             |           +----------+----------+
+             |                      |
+             +----------+-----------+
+                        |
+                        v
+          +-----------------------------+
+          | Final Bedtime Polish Prompt |
+          | softens the ending          |
+          +-------------+---------------+
+                        |
+                        v
+          +-----------------------------+
+          | Story Card + Final Story    |
+          | printed for the user        |
+          +-----------------------------+
 ```
 
 ## How It Works
