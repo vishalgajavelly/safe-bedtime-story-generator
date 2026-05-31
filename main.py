@@ -25,7 +25,7 @@ MAX_REVISION_ROUNDS = 2
 
 MIN_WORDS = 350
 MAX_WORDS = 900
-TARGET_WORDS = "450-650"
+TARGET_WORDS = "500-700"
 TARGET_AGE_RANGE = "5-10"
 
 HARD_GATE_MINIMUMS = {
@@ -590,6 +590,7 @@ Revision rules:
 - Fix failed validator checks and judge gates.
 - Do not add new danger, conflict, or high-energy action.
 - Keep the story between {MIN_WORDS} and {MAX_WORDS} words.
+- If validator_result says the story is too short, expand it with calm sensory details, character feelings, and a gentle bedtime transition.
 - Return only the revised title and story.
 """.strip()
 
@@ -624,6 +625,7 @@ Rules:
 - Do not add new conflict or new events.
 - Reduce suspense, loud excitement, or exclamation-heavy language near the end.
 - End with quiet comfort, safety, rest, home, sleep, moonlight, or dreams.
+- Preserve the story length; do not shorten it below the minimum word count.
 - Return only the polished title and story.
 """.strip()
 
