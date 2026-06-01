@@ -116,7 +116,12 @@ Story style:
 # OpenAI call
 # -----------------------------
 
-def call_model(prompt: str, max_tokens: int = 3000, temperature: float = 0.2) -> str:
+def call_model(
+    prompt: str,
+    max_tokens: int = 3000,
+    temperature: float = 0.2,
+    json_mode: bool = False,
+) -> str:
     """
     Calls OpenAI with the assignment's required model.
 
@@ -133,12 +138,26 @@ def call_model(prompt: str, max_tokens: int = 3000, temperature: float = 0.2) ->
     # ChatCompletion directly, so keep that path as a compatibility fallback.
     if hasattr(openai, "OpenAI"):
         client = openai.OpenAI(api_key=api_key)
-        resp = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        request_args: Dict[str, Any] = {
+            "model": MODEL_NAME,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_mode:
+            request_args["response_format"] = {"type": "json_object"}
+
+        try:
+            resp = client.chat.completions.create(
+                **request_args,
+            )
+        except Exception:
+            if not json_mode:
+                raise
+            request_args.pop("response_format", None)
+            resp = client.chat.completions.create(
+                **request_args,
+            )
         return (resp.choices[0].message.content or "").strip()
 
     openai.api_key = api_key
@@ -278,6 +297,7 @@ Turn the user's request into a safe story specification for children ages {TARGE
 {SAFETY_POLICY}
 
 Return JSON only. Do not include markdown.
+Begin the response with {{ and end it with }}.
 
 Required JSON shape:
 {{
@@ -303,7 +323,7 @@ User request:
 {user_request}
 """.strip()
 
-    raw = call_model(prompt, max_tokens=1200, temperature=0.1)
+    raw = call_model(prompt, max_tokens=1200, temperature=0.1, json_mode=True)
     spec = safe_json_loads(raw, fallback)
 
     # Ensure required fields exist even if model omits them.
@@ -478,6 +498,7 @@ Hard gates:
 - overall_score must be >= {QUALITY_THRESHOLD}
 
 Return JSON only. Do not include markdown.
+Begin the response with {{ and end it with }}.
 
 Required JSON shape:
 {{
@@ -503,7 +524,7 @@ Rules:
 - Do not rewrite the story.
 """.strip()
 
-    raw = call_model(prompt, max_tokens=1400, temperature=0.1)
+    raw = call_model(prompt, max_tokens=1400, temperature=0.1, json_mode=True)
     result = safe_json_loads(raw, fallback)
 
     # Normalize missing fields.
@@ -596,6 +617,48 @@ Revision rules:
 """.strip()
 
     return call_model(prompt, max_tokens=2400, temperature=0.25)
+
+
+def expand_short_story(
+    story: str,
+    spec: Dict[str, Any],
+    validator_result: Dict[str, Any],
+) -> str:
+    """
+    Repairs only one deterministic failure: stories that are too short.
+    """
+    if not any(
+        str(check).startswith("word_count_too_short")
+        for check in validator_result.get("failed_checks", [])
+    ):
+        return story
+
+    prompt = f"""
+You are a children's bedtime story length editor.
+
+Expand the story to 450-650 words without changing its title, main characters,
+setting, plot, or gentle bedtime meaning.
+
+Story specification:
+{json.dumps(spec, indent=2)}
+
+Validator result:
+{json.dumps(validator_result, indent=2)}
+
+Story:
+\"\"\"
+{story}
+\"\"\"
+
+Rules:
+- Preserve the same safe, calm story.
+- Add calm sensory details, character feelings, and a gentle bedtime transition.
+- Do not add danger, fear, weapons, loud action, or a new conflict.
+- Keep the ending quiet, safe, and sleepy.
+- Return only the expanded title and story.
+""".strip()
+
+    return call_model(prompt, max_tokens=2400, temperature=0.2)
 
 
 def apply_bedtime_taper(story: str, spec: Dict[str, Any]) -> str:
@@ -692,6 +755,8 @@ def generate_final_story(user_request: str) -> Tuple[str, Dict[str, Any]]:
 
     story = generate_story(spec)
     validators = run_validators(story, spec)
+    story = expand_short_story(story, spec, validators)
+    validators = run_validators(story, spec)
     judge = judge_story(story, spec, validators)
     iteration_history = [
         {
@@ -719,6 +784,8 @@ def generate_final_story(user_request: str) -> Tuple[str, Dict[str, Any]]:
 
         story = revise_story(story, spec, judge, validators)
         validators = run_validators(story, spec)
+        story = expand_short_story(story, spec, validators)
+        validators = run_validators(story, spec)
         judge = judge_story(story, spec, validators)
         iteration_history.append(
             {
@@ -736,6 +803,8 @@ def generate_final_story(user_request: str) -> Tuple[str, Dict[str, Any]]:
 
     # Final bedtime-specific polish.
     tapered_story = apply_bedtime_taper(story, spec)
+    tapered_validators = run_validators(tapered_story, spec)
+    tapered_story = expand_short_story(tapered_story, spec, tapered_validators)
     tapered_validators = run_validators(tapered_story, spec)
     tapered_judge = judge_story(tapered_story, spec, tapered_validators)
     iteration_history.append(

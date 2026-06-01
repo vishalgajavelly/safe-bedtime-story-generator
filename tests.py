@@ -68,7 +68,12 @@ def fake_judge_result(decision: str = "accept") -> dict:
     }
 
 
-def fake_call_model(prompt: str, max_tokens: int = 3000, temperature: float = 0.1) -> str:
+def fake_call_model(
+    prompt: str,
+    max_tokens: int = 3000,
+    temperature: float = 0.1,
+    json_mode: bool = False,
+) -> str:
     if "children's bedtime story planner" in prompt:
         return json.dumps(
             {
