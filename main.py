@@ -25,7 +25,7 @@ MAX_REVISION_ROUNDS = 2
 
 MIN_WORDS = 350
 MAX_WORDS = 900
-TARGET_WORDS = "450-650"
+TARGET_WORDS = "550-700"
 TARGET_AGE_RANGE = "5-10"
 
 HARD_GATE_MINIMUMS = {
@@ -336,6 +336,7 @@ Write a bedtime story using this story specification:
 Length:
 - Aim for {TARGET_WORDS} words.
 - Minimum {MIN_WORDS}, maximum {MAX_WORDS}.
+- Do not return a story under 400 words.
 
 Return only the title and story. Do not include analysis, metadata, rubric scores, or notes.
 """.strip()
@@ -590,6 +591,7 @@ Revision rules:
 - Fix failed validator checks and judge gates.
 - Do not add new danger, conflict, or high-energy action.
 - Keep the story between {MIN_WORDS} and {MAX_WORDS} words.
+- If the validator reports word_count_too_short, expand the story above 400 words while preserving the same gentle plot.
 - Return only the revised title and story.
 """.strip()
 
